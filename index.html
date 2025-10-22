@@ -22,6 +22,9 @@
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
 
+  let lastAdded = null;
+  let lastAddedData = null;
+
   // Додавання гімнастки
   window.addGymnast = async function() {
     const name = document.getElementById("name").value.trim();
@@ -34,7 +37,8 @@
       return;
     }
 
-    const gymnastRef = ref(db, "gymnasts/" + name.replace(/\s+/g, "_"));
+    const gymnastKey = name.replace(/\s+/g, "_");
+    const gymnastRef = ref(db, "gymnasts/" + gymnastKey);
     const snapshot = await new Promise(resolve => {
       onValue(gymnastRef, resolve, { onlyOnce: true });
     });
@@ -44,10 +48,33 @@
     data.suma = (data.obruč || 0) + (data.myach || 0) + (data.bułavy || 0) + (data.strichka || 0);
     await set(gymnastRef, data);
 
+    // Зберігаємо останню додану
+    lastAdded = gymnastKey;
+    lastAddedData = { name, club, event, score };
+
+    // Показуємо екран нової гімнастки
+    showNewGymnastOverlay(name, club, event, score);
+
     document.getElementById("name").value = "";
     document.getElementById("club").value = "";
     document.getElementById("score").value = "";
   };
+
+  function showNewGymnastOverlay(name, club, event, score) {
+    const overlay = document.getElementById("newGymnastOverlay");
+    const content = document.getElementById("overlayContent");
+    content.innerHTML = `
+      <h1>${name}</h1>
+      <h2>${club}</h2>
+      <h3>${event.toUpperCase()}</h3>
+      <div class="score">${score.toFixed(3)}</div>
+    `;
+    overlay.classList.add("visible");
+
+    setTimeout(() => {
+      overlay.classList.remove("visible");
+    }, 30000); // 30 секунд
+  }
 
   // Очистити всі дані
   window.clearAll = async function() {
@@ -72,7 +99,7 @@
     panel.classList.toggle("visible");
   };
 
-  // Відображення таблиці
+  // Відображення таблиць
   const tableContainer = document.getElementById("tablesWrapper");
 
   onValue(ref(db, "gymnasts"), snapshot => {
@@ -83,7 +110,7 @@
 
     tableContainer.innerHTML = "";
 
-    const chunkSize = 20;
+    const chunkSize = 15;
     const chunks = [];
     for (let i = 0; i < arr.length; i += chunkSize) {
       chunks.push(arr.slice(i, i + chunkSize));
@@ -114,7 +141,9 @@
       group.forEach((g, i) => {
         const row = document.createElement("tr");
         const crown = (i + index * chunkSize) === 0 ? "👑" : "";
-        row.classList.add("fade-up");
+
+        if (g.key === lastAdded) row.classList.add("highlight-new");
+
         row.innerHTML = `
           <td>${i + 1 + index * chunkSize}</td>
           <td class="${(i + index * chunkSize) === 0 ? 'shine' : ''}">${crown} ${g.name}</td>
@@ -127,13 +156,16 @@
           <td><button class="delete-btn" onclick="deleteGymnast('${g.key}')">🍁</button></td>
         `;
         tbody.appendChild(row);
-        setTimeout(() => row.classList.remove("fade-up"), 1500);
+
+        if (g.key === lastAdded) {
+          setTimeout(() => row.classList.remove("highlight-new"), 2000);
+        }
       });
 
       tableContainer.appendChild(table);
     });
 
-    // ✅ Автоматичний масштаб для всіх таблиць
+    // Автомасштаб
     const totalRows = arr.length;
     const maxRowsVisible = 12;
     let scale = 1;
@@ -219,15 +251,17 @@ th {
   border-bottom: 2px solid #f6c453;
 }
 
-.fade-up {
-  animation: fadeUp 0.9s ease-out;
+.highlight-new {
+  animation: appearIn 2s ease-out;
+  background-color: rgba(255,215,0,0.3);
 }
 
-@keyframes fadeUp {
+@keyframes appearIn {
   from { transform: translateY(80px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 
+/* Панель редагування */
 #editPanel {
   position: fixed;
   bottom: -200px;
@@ -289,6 +323,46 @@ button:hover {
   from { text-shadow: 0 0 10px #f6c453, 0 0 20px #b8860b; }
   to { text-shadow: 0 0 20px #ffd700, 0 0 40px #f6c453; }
 }
+
+/* ✅ Екран нової гімнастки */
+#newGymnastOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #f6c453;
+  flex-direction: column;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1s ease;
+  z-index: 100;
+}
+#newGymnastOverlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+#newGymnastOverlay h1 {
+  font-size: 5vw;
+  margin: 10px 0;
+}
+#newGymnastOverlay h2 {
+  font-size: 3vw;
+  margin: 5px 0;
+  color: #ffd700;
+}
+#newGymnastOverlay h3 {
+  font-size: 2.5vw;
+  margin: 5px 0;
+  color: #fff;
+}
+#newGymnastOverlay .score {
+  font-size: 6vw;
+  color: #fff799;
+  text-shadow: 0 0 20px #ffd700;
+}
 </style>
 </head>
 
@@ -310,6 +384,11 @@ button:hover {
     <input type="text" id="score" placeholder="Оцінка (27.650)">
     <button onclick="addGymnast()">Додати</button>
     <button onclick="clearAll()">Очистити таблицю</button>
+  </div>
+
+  <!-- ✅ Великий екран для нової гімнастки -->
+  <div id="newGymnastOverlay">
+    <div id="overlayContent"></div>
   </div>
 </body>
 </html>
