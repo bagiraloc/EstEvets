@@ -54,7 +54,7 @@
   window.clearAll = async function() {
     if (confirm("Ви впевнені, що хочете повністю очистити таблицю?")) {
       const gymnastsRef = ref(db, "gymnasts");
-      await set(gymnastsRef, {}); // видаляє всіх гімнасток
+      await set(gymnastsRef, {});
       alert("Таблицю очищено!");
     }
   };
@@ -64,7 +64,7 @@
 
   onValue(ref(db, "gymnasts"), snapshot => {
     const data = snapshot.val() || {};
-    const arr = Object.values(data).sort((a, b) => b.suma - a.suma); // правильне сортування
+    const arr = Object.values(data).sort((a, b) => b.suma - a.suma);
 
     tableBody.innerHTML = "";
     arr.forEach((g, i) => {
@@ -106,7 +106,7 @@ body {
   font-family: "Segoe UI", sans-serif;
   overflow-x: hidden;
   margin: 0;
-  padding-bottom: 80px; /* місце для панелі */
+  padding-bottom: 130px; /* збільшено місце для панелі */
 }
 
 h1 {
@@ -152,13 +152,15 @@ th {
 
 tfoot {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
+  bottom: 10px; /* трохи вище краю екрана */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 95%;
   background: rgba(13,13,13,0.95);
   padding: 10px;
   text-align: center;
   box-shadow: 0 -2px 10px rgba(246,196,83,0.2);
+  border-radius: 10px;
   z-index: 10;
 }
 
