@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Золота Осінь 2025 🍁</title>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getDatabase, ref, set, get, child, update, onValue } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+    const firebaseConfig = {
+  apiKey: "AIzaSyDBXt2gMo92d6MpzxdzEvLI8UMcyHipVTg",
+  authDomain: "estevents.firebaseapp.com",
+  databaseURL: "https://estevents-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "estevents",
+  storageBucket: "estevents.firebasestorage.app",
+  messagingSenderId: "227576344701",
+  appId: "1:227576344701:web:adf679a530b4ce72d5c114",
+  measurementId: "G-3ZDEP57KXF"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    /* ---------- ГЛОБАЛЬНІ ЗМІННІ ---------- */
+    let results = {};
+    const events = ["Обруч", "М'яч", "Булави", "Стрічка"];
+
+    function renderTable() {
+      const tbody = document.getElementById("results-body");
+      tbody.innerHTML = "";
+
+      const arr = Object.values(results).map(g => ({
+        ...g,
+        sum: events.reduce((s, e) => s + (parseFloat(g[e]) || 0), 0)
+      })).sort((a,b)=>b.sum - a.sum);
+
+      arr.forEach((g,i)=>{
+        const tr = document.createElement("tr");
+        const isLeader = i===0;
+        tr.innerHTML = `
+          <td>${i+1}</td>
+          <td>${isLeader ? "👑 " : ""}${g.name}</td>
+          <td>${g.club}</td>
+          ${events.map(e=>`<td>${g[e]||""}</td>`).join("")}
+          <td>${g.sum ? g.sum.toFixed(3):""}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function saveGymnast(name, club, event, score) {
+      if(!name || !event || !score) return;
+      const key = name.trim().toLowerCase().replace(/\s+/g,"_");
+      const dataRef = ref(db, "gymnasts/" + key);
+
+      get(dataRef).then(snap=>{
+        const old = snap.exists()? snap.val() : {};
+        old.name = name;
+        old.club = club || old.club || "";
+        old[event] = parseFloat(score);
+        update(dataRef, old);
+      });
+    }
+
+    /* ---------- РЕАЛЬНЕ ОНОВЛЕННЯ ---------- */
+    onValue(ref(db,"gymnasts"), snap=>{
+      results = snap.val() || {};
+      renderTable();
+    });
+
+    /* ---------- ДОДАВАННЯ УЧАСНИЦІ ---------- */
+    window.addGymnast = function() {
+      const n=document.getElementById("name").value.trim();
+      const c=document.getElementById("club").value.trim();
+      const e=document.getElementById("event").value;
+      const s=document.getElementById("score").value.trim();
+      saveGymnast(n,c,e,s);
+      document.getElementById("score").value="";
+    };
+
+    window.clearTable = function(){
+      document.getElementById("results-body").innerHTML="";
+    };
+
+    /* ---------- ВХІД СУДДІ ---------- */
+    window.checkPassword = function(){
+      const p = prompt("Введіть пароль судді:");
+      if(p==="123"){
+        document.getElementById("judge-panel").style.display="block";
+      } else {
+        alert("❌ Невірний пароль");
+      }
+    };
+  </script>
+
+  <style>
+    body{
+      margin:0;
+      font-family:Arial, sans-serif;
+      background:#0d0d0d;
+      color:#f6c453;
+      overflow-x:hidden;
+    }
+    h1{
+      text-align:center;
+      color:#f6c453;
+      text-shadow:0 0 20px #f6c453;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      background:rgba(30,30,30,.9);
+      border-radius:14px;
+      box-shadow:0 0 20px rgba(246,196,83,.3);
+    }
+    th,td{
+      padding:6px;
+      text-align:center;
+      color:#f6c453;
+    }
+    th{
+      border-bottom:2px solid #f6c453;
+    }
+    #judge-panel{
+      display:none;
+      padding:1rem;
+      background:#1e1e1e;
+      position:fixed;
+      bottom:0;
+      width:100%;
+      box-shadow:0 -2px 10px rgba(246,196,83,.3);
+    }
+    input,select{
+      background:#000;
+      color:#f6c453;
+      border:1px solid #f6c453;
+      border-radius:5px;
+      padding:4px 6px;
+      margin:3px;
+    }
+    button{
+      background:linear-gradient(90deg,#f6c453,#b8860b);
+      border:none;
+      border-radius:8px;
+      color:#000;
+      font-weight:bold;
+      padding:5px 10px;
+      cursor:pointer;
+    }
+    .leaf{
+      position:fixed;
+      top:-10vh;
+      color:#ffd700;
+      font-size:24px;
+      opacity:.8;
+      animation:fall linear infinite;
+      z-index:-1;
+    }
+    @keyframes fall{
+      0%{transform:translateY(0) rotate(0);}
+      100%{transform:translateY(110vh) rotate(360deg);}
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Золота Осінь 2025 🍁</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Місце</th><th>Ім’я</th><th>Клуб</th>
+        <th>Обруч</th><th>М'яч</th><th>Булави</th><th>Стрічка</th><th>Сума</th>
+      </tr>
+    </thead>
+    <tbody id="results-body"></tbody>
+  </table>
+
+  <div id="judge-panel">
+    <input id="name" placeholder="Прізвище та ім’я" />
+    <input id="club" placeholder="Команда" />
+    <select id="event">
+      <option>Обруч</option>
+      <option>М'яч</option>
+      <option>Булави</option>
+      <option>Стрічка</option>
+    </select>
+    <input id="score" placeholder="Оцінка" />
+    <button onclick="addGymnast()">➕ Додати</button>
+    <button onclick="clearTable()">🧹 Очистити таблицю</button>
+  </div>
+
+  <button style="position:fixed;bottom:10px;right:10px;" onclick="checkPassword()">🔐 Увійти як суддя</button>
+
+  <script>
+    /* Додаємо листочки 🍁 */
+    for(let i=0;i<25;i++){
+      const l=document.createElement("div");
+      l.className="leaf";
+      l.textContent=Math.random()>0.5?"🍁":"🍂";
+      l.style.left=Math.random()*100+"vw";
+      l.style.animationDuration=15+Math.random()*15+"s";
+      l.style.animationDelay=Math.random()*20+"s";
+      document.body.appendChild(l);
+    }
+  </script>
+</body>
+</html>
