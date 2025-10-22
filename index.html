@@ -50,6 +50,15 @@
     document.getElementById("score").value = "";
   };
 
+  // Очистити всі дані
+  window.clearAll = async function() {
+    if (confirm("Ви впевнені, що хочете повністю очистити таблицю?")) {
+      const gymnastsRef = ref(db, "gymnasts");
+      await set(gymnastsRef, {}); // видаляє всіх гімнасток
+      alert("Таблицю очищено!");
+    }
+  };
+
   // Відображення таблиці
   const tableBody = document.getElementById("gymnastTable");
 
@@ -217,6 +226,7 @@ button:hover {
     </select>
     <input type="text" id="score" placeholder="Оцінка (наприклад 27.650)">
     <button onclick="addGymnast()">Додати</button>
+    <button onclick="clearAll()">Очистити таблицю 🧹</button>
   </tfoot>
 </body>
 </html>
