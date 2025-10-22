@@ -7,7 +7,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-  import { getDatabase, ref, onValue, set, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+  import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDBXt2gMo92d6MpzxdzEvLI8UMcyHipVTg",
@@ -23,7 +23,7 @@
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
 
-  // ➕ Додавання гімнастки
+  // Додавання гімнастки
   window.addGymnast = async function() {
     const name = document.getElementById("name").value.trim();
     const club = document.getElementById("club").value.trim();
@@ -50,7 +50,7 @@
     document.getElementById("score").value = "";
   };
 
-  // 🧹 Очистити всі дані
+  // Очистити всі дані
   window.clearAll = async function() {
     if (confirm("Ви впевнені, що хочете повністю очистити таблицю?")) {
       const gymnastsRef = ref(db, "gymnasts");
@@ -59,37 +59,13 @@
     }
   };
 
-  // ❌ Видалення окремої гімнастки
-  window.deleteGymnast = async function(name) {
-    if (confirm(`Видалити ${name}?`)) {
-      const gymnastRef = ref(db, "gymnasts/" + name.replace(/\s+/g, "_"));
-      await remove(gymnastRef);
-    }
-  };
-
-  // ⚙️ Показати/сховати панель — НАДІЙНА РЕАЛІЗАЦІЯ
+  // Показати/сховати панель редагування
   window.togglePanel = function() {
     const panel = document.getElementById("editPanel");
-    if (!panel) return;
-    // Якщо вже видима — заховати
-    if (panel.classList.contains("visible")) {
-      panel.classList.remove("visible");
-      // явне сховання через стилі для сумісності
-      panel.style.bottom = "-260px";
-      // зберегти доступність фокусу
-      panel.setAttribute("aria-hidden", "true");
-    } else {
-      // показати
-      panel.classList.add("visible");
-      panel.style.bottom = "10px";
-      panel.setAttribute("aria-hidden", "false");
-      // на мобільних фокус на перше поле
-      const inp = panel.querySelector("input#name");
-      if (inp) setTimeout(() => inp.focus(), 300);
-    }
+    panel.classList.toggle("visible");
   };
 
-  // 📊 Відображення таблиці
+  // Відображення таблиці
   const tableBody = document.getElementById("gymnastTable");
 
   onValue(ref(db, "gymnasts"), snapshot => {
@@ -110,14 +86,13 @@
         <td>${g.bułavy || "-"}</td>
         <td>${g.strichka || "-"}</td>
         <td><b>${g.suma.toFixed(3)}</b></td>
-        <td><button class="leaf-btn" onclick="deleteGymnast('${g.name.replace(/'/g,"\\'")}')">🍁</button></td>
       `;
       tableBody.appendChild(row);
       setTimeout(() => row.classList.remove("fly-in"), 1000);
     });
   });
 
-  // 🍂 Анімація листків
+  // Анімація листків 🍁
   function createLeaf() {
     const leaf = document.createElement("div");
     leaf.classList.add("leaf");
@@ -136,7 +111,7 @@ body {
   background-color: #0d0d0d;
   color: #f6c453;
   font-family: "Segoe UI", sans-serif;
-  overflow-x: hidden;
+  overflow: hidden;
   margin: 0;
 }
 
@@ -166,6 +141,8 @@ h1 {
   display: flex;
   justify-content: center;
   align-items: center;
+  transform-origin: top center;
+  transition: transform 0.5s ease;
 }
 
 table {
@@ -173,6 +150,7 @@ table {
   background: rgba(30,30,30,0.9);
   border-radius: 14px;
   box-shadow: 0 0 20px rgba(246,196,83,0.3);
+  transition: transform 0.3s ease;
 }
 
 th, td {
@@ -198,7 +176,7 @@ th {
 
 #editPanel {
   position: fixed;
-  bottom: -250px;
+  bottom: -200px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(13,13,13,0.95);
@@ -208,10 +186,10 @@ th {
   border-radius: 12px;
   width: 95%;
   z-index: 20;
-  transition: bottom 0.35s ease;
+  transition: bottom 0.5s ease;
 }
 #editPanel.visible {
-  /* додатковий клас — для доступності/статусу, стиль нижче керується з JS */
+  bottom: 10px;
 }
 
 input, select {
@@ -231,22 +209,10 @@ button {
   padding: 6px 12px;
   font-weight: bold;
   margin: 3px;
-  cursor: pointer;
 }
 
 button:hover {
   background: linear-gradient(90deg, #ffd700, #f6c453);
-}
-
-.leaf-btn {
-  background: none;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-.leaf-btn:hover {
-  transform: scale(1.3) rotate(15deg);
 }
 
 .shine {
@@ -256,4 +222,43 @@ button:hover {
 }
 
 @keyframes glow {
-  from { text-shadow: 0 0 1
+  from { text-shadow: 0 0 10px #f6c453, 0 0 20px #b8860b; }
+  to { text-shadow: 0 0 20px #ffd700, 0 0 40px #f6c453; }
+}
+</style>
+</head>
+
+<body>
+  <h1>Золота Осінь 2025 🍁</h1>
+  <div class="table-container">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th>Місце</th>
+          <th>Ім’я</th>
+          <th>Клуб</th>
+          <th>Обруч</th>
+          <th>М’яч</th>
+          <th>Булави</th>
+          <th>Стрічка</th>
+          <th>Сума</th>
+        </tr>
+      </thead>
+      <tbody id="gymnastTable"></tbody>
+    </table>
+  </div>
+
+  <button style="position:fixed; bottom:10px; right:10px; z-index:30;" onclick="togglePanel()">Редагувати 🛠️</button>
+
+  <div id="editPanel">
+    <input type="text" id="name" placeholder="Ім’я">
+    <input type="text" id="club" placeholder="Клуб">
+    <select id="event">
+      <option value="obruč">Обруч</option>
+      <option value="myach">М’яч</option>
+      <option value="bułavy">Булави</option>
+      <option value="strichka">Стрічка</option>
+    </select>
+    <input type="text" id="score" placeholder="Оцінка (27.650)">
+    <button onclick="addGymnast()">Додати</button>
+    <button onclick="cle
