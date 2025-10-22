@@ -67,15 +67,25 @@
     }
   };
 
-  // ⚙️ Показати/сховати панель
+  // ⚙️ Показати/сховати панель — НАДІЙНА РЕАЛІЗАЦІЯ
   window.togglePanel = function() {
     const panel = document.getElementById("editPanel");
+    if (!panel) return;
+    // Якщо вже видима — заховати
     if (panel.classList.contains("visible")) {
       panel.classList.remove("visible");
-      panel.style.bottom = "-250px";
+      // явне сховання через стилі для сумісності
+      panel.style.bottom = "-260px";
+      // зберегти доступність фокусу
+      panel.setAttribute("aria-hidden", "true");
     } else {
+      // показати
       panel.classList.add("visible");
       panel.style.bottom = "10px";
+      panel.setAttribute("aria-hidden", "false");
+      // на мобільних фокус на перше поле
+      const inp = panel.querySelector("input#name");
+      if (inp) setTimeout(() => inp.focus(), 300);
     }
   };
 
@@ -100,7 +110,7 @@
         <td>${g.bułavy || "-"}</td>
         <td>${g.strichka || "-"}</td>
         <td><b>${g.suma.toFixed(3)}</b></td>
-        <td><button class="leaf-btn" onclick="deleteGymnast('${g.name}')">🍁</button></td>
+        <td><button class="leaf-btn" onclick="deleteGymnast('${g.name.replace(/'/g,"\\'")}')">🍁</button></td>
       `;
       tableBody.appendChild(row);
       setTimeout(() => row.classList.remove("fly-in"), 1000);
@@ -198,7 +208,10 @@ th {
   border-radius: 12px;
   width: 95%;
   z-index: 20;
-  transition: bottom 0.5s ease;
+  transition: bottom 0.35s ease;
+}
+#editPanel.visible {
+  /* додатковий клас — для доступності/статусу, стиль нижче керується з JS */
 }
 
 input, select {
@@ -243,29 +256,4 @@ button:hover {
 }
 
 @keyframes glow {
-  from { text-shadow: 0 0 10px #f6c453, 0 0 20px #b8860b; }
-  to { text-shadow: 0 0 20px #ffd700, 0 0 40px #f6c453; }
-}
-</style>
-</head>
-
-<body>
-  <h1>Золота Осінь 2025 🍁</h1>
-  <div class="table-container">
-    <table id="mainTable">
-      <thead>
-        <tr>
-          <th>Місце</th>
-          <th>Ім’я</th>
-          <th>Клуб</th>
-          <th>Обруч</th>
-          <th>М’яч</th>
-          <th>Булави</th>
-          <th>Стрічка</th>
-          <th>Сума</th>
-          <th>Видалити</th>
-        </tr>
-      </thead>
-      <tbody id="gymnastTable"></tbody>
-    </table>
-  </di
+  from { text-shadow: 0 0 1
