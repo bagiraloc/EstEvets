@@ -110,7 +110,7 @@
 
     tableContainer.innerHTML = "";
 
-    const chunkSize = 15;
+    const chunkSize = 20;
     const chunks = [];
     for (let i = 0; i < arr.length; i += chunkSize) {
       chunks.push(arr.slice(i, i + chunkSize));
@@ -148,10 +148,10 @@
           <td>${i + 1 + index * chunkSize}</td>
           <td class="${(i + index * chunkSize) === 0 ? 'shine' : ''}">${crown} ${g.name}</td>
           <td>${g.club}</td>
-          <td>${g.obruč || "-"}</td>
-          <td>${g.myach || "-"}</td>
-          <td>${g.bułavy || "-"}</td>
-          <td>${g.strichka || "-"}</td>
+          <td>${g.Обруч || "-"}</td>
+          <td>${g.Мʼяч || "-"}</td>
+          <td>${g.Булави || "-"}</td>
+          <td>${g.Стрічка || "-"}</td>
           <td><b>${g.suma.toFixed(3)}</b></td>
           <td><button class="delete-btn" onclick="deleteGymnast('${g.key}')">🍁</button></td>
         `;
