@@ -5,9 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Золота Осінь 2025</title>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js"></script>
+ <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, set, onValue, get, child } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDBXt2gMo92d6MpzxdzEvLI8UMcyHipVTg",
+    authDomain: "estevents.firebaseapp.com",
+    databaseURL: "https://estevents-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "estevents",
+    storageBucket: "estevents.firebasestorage.app",
+    messagingSenderId: "227576344701",
+    appId: "1:227576344701:web:adf679a530b4ce72d5c114",
+    measurementId: "G-3ZDEP57KXF"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  window.db = db; // робимо доступним у глобальному контексті
+</script>
 
   <style>
     body {
