@@ -59,6 +59,12 @@
     }
   };
 
+  // Показати/сховати панель редагування
+  window.togglePanel = function() {
+    const panel = document.getElementById("editPanel");
+    panel.classList.toggle("visible");
+  };
+
   // Відображення таблиці
   const tableBody = document.getElementById("gymnastTable");
 
@@ -70,6 +76,7 @@
     arr.forEach((g, i) => {
       const row = document.createElement("tr");
       const crown = i === 0 ? "👑" : "";
+      row.classList.add("fly-in");
       row.innerHTML = `
         <td>${i + 1}</td>
         <td class="${i === 0 ? 'shine' : ''}">${crown} ${g.name}</td>
@@ -81,6 +88,7 @@
         <td><b>${g.suma.toFixed(3)}</b></td>
       `;
       tableBody.appendChild(row);
+      setTimeout(() => row.classList.remove("fly-in"), 1000);
     });
   });
 
@@ -95,7 +103,6 @@
     document.body.appendChild(leaf);
     setTimeout(() => leaf.remove(), 15000);
   }
-
   setInterval(createLeaf, 500);
 </script>
 
@@ -104,16 +111,15 @@ body {
   background-color: #0d0d0d;
   color: #f6c453;
   font-family: "Segoe UI", sans-serif;
-  overflow-x: hidden;
+  overflow: hidden;
   margin: 0;
-  padding-bottom: 130px; /* збільшено місце для панелі */
 }
 
 h1 {
   text-align: center;
   color: #f6c453;
   text-shadow: 0 0 20px #f6c453;
-  margin-top: 20px;
+  margin-top: 10px;
 }
 
 .leaf {
@@ -130,19 +136,28 @@ h1 {
   100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
 }
 
+.table-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform-origin: top center;
+  transition: transform 0.5s ease;
+}
+
 table {
-  width: 95%;
-  margin: 20px auto;
   border-collapse: collapse;
   background: rgba(30,30,30,0.9);
   border-radius: 14px;
   box-shadow: 0 0 20px rgba(246,196,83,0.3);
+  transition: transform 0.3s ease;
 }
 
 th, td {
-  padding: 6px;
+  padding: 6px 8px;
   text-align: center;
   color: #f6c453;
+  white-space: nowrap;
 }
 
 th {
@@ -150,18 +165,31 @@ th {
   border-bottom: 2px solid #f6c453;
 }
 
-tfoot {
+.fly-in {
+  animation: flyIn 0.8s ease-out;
+}
+
+@keyframes flyIn {
+  from { transform: translateY(100vh); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+#editPanel {
   position: fixed;
-  bottom: 10px; /* трохи вище краю екрана */
+  bottom: -200px;
   left: 50%;
   transform: translateX(-50%);
-  width: 95%;
   background: rgba(13,13,13,0.95);
-  padding: 10px;
+  padding: 12px;
   text-align: center;
   box-shadow: 0 -2px 10px rgba(246,196,83,0.2);
-  border-radius: 10px;
-  z-index: 10;
+  border-radius: 12px;
+  width: 95%;
+  z-index: 20;
+  transition: bottom 0.5s ease;
+}
+#editPanel.visible {
+  bottom: 10px;
 }
 
 input, select {
@@ -178,8 +206,9 @@ button {
   color: #0d0d0d;
   border: none;
   border-radius: 6px;
-  padding: 5px 10px;
+  padding: 6px 12px;
   font-weight: bold;
+  margin: 3px;
 }
 
 button:hover {
@@ -201,23 +230,27 @@ button:hover {
 
 <body>
   <h1>Золота Осінь 2025 🍁</h1>
-  <table>
-    <thead>
-      <tr>
-        <th>Місце</th>
-        <th>Ім’я</th>
-        <th>Клуб</th>
-        <th>Обруч</th>
-        <th>М’яч</th>
-        <th>Булави</th>
-        <th>Стрічка</th>
-        <th>Сума</th>
-      </tr>
-    </thead>
-    <tbody id="gymnastTable"></tbody>
-  </table>
+  <div class="table-container">
+    <table id="mainTable">
+      <thead>
+        <tr>
+          <th>Місце</th>
+          <th>Ім’я</th>
+          <th>Клуб</th>
+          <th>Обруч</th>
+          <th>М’яч</th>
+          <th>Булави</th>
+          <th>Стрічка</th>
+          <th>Сума</th>
+        </tr>
+      </thead>
+      <tbody id="gymnastTable"></tbody>
+    </table>
+  </div>
 
-  <tfoot>
+  <button style="position:fixed; bottom:10px; right:10px; z-index:30;" onclick="togglePanel()">Редагувати 🛠️</button>
+
+  <div id="editPanel">
     <input type="text" id="name" placeholder="Ім’я">
     <input type="text" id="club" placeholder="Клуб">
     <select id="event">
@@ -226,9 +259,6 @@ button:hover {
       <option value="bułavy">Булави</option>
       <option value="strichka">Стрічка</option>
     </select>
-    <input type="text" id="score" placeholder="Оцінка (наприклад 27.650)">
+    <input type="text" id="score" placeholder="Оцінка (27.650)">
     <button onclick="addGymnast()">Додати</button>
-    <button onclick="clearAll()">Очистити таблицю 🧹</button>
-  </tfoot>
-</body>
-</html>
+    <button onclick="cle
