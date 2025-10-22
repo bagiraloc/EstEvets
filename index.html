@@ -92,9 +92,18 @@
       const row = document.createElement("tr");
       const crown = i === 0 ? "👑" : "";
 
-      // якщо це остання додана гімнастка — додаємо ефект появи знизу + мерехтіння
       if (g.key === lastAdded) {
         row.classList.add("new-gymnast");
+
+        // ✨ Додаємо ефект мерехтіння лише імені
+        setTimeout(() => {
+          const nameCell = row.querySelector("td:nth-child(2)");
+          if (nameCell) {
+            nameCell.classList.add("blink-name");
+            setTimeout(() => nameCell.classList.remove("blink-name"), 5000);
+          }
+        }, 200);
+
         setTimeout(() => row.classList.remove("new-gymnast"), 4000);
       }
 
@@ -197,20 +206,31 @@ th {
 }
 
 @keyframes fadeInUp {
-  from {
-    transform: translateY(80px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+  from { transform: translateY(80px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
-/* 🌟 мерехтіння останньої доданої */
 @keyframes blink {
   0%, 100% { background-color: rgba(246,196,83,0.1); }
   50% { background-color: rgba(246,196,83,0.4); }
+}
+
+/* ✨ Ім’я останньої гімнастки мерехтить світлом */
+.blink-name {
+  animation: nameGlow 1s ease-in-out infinite alternate;
+  color: #fff7c2;
+  text-shadow: 0 0 10px #ffd966, 0 0 20px #f6c453, 0 0 30px #ffcc33;
+}
+
+@keyframes nameGlow {
+  from {
+    color: #fff7c2;
+    text-shadow: 0 0 5px #ffd966, 0 0 10px #f6c453;
+  }
+  to {
+    color: #ffffff;
+    text-shadow: 0 0 20px #ffd966, 0 0 40px #ffcc33;
+  }
 }
 
 #editPanel {
