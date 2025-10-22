@@ -43,9 +43,9 @@
       onValue(gymnastRef, resolve, { onlyOnce: true });
     });
 
-    let data = snapshot.val() || { name, club, obruč: 0, myach: 0, bułavy: 0, strichka: 0, suma: 0 };
+    let data = snapshot.val() || { name, club, Обруч: 0, Мʼяч: 0, Булави: 0, Стрічка: 0, suma: 0 };
     data[event] = score;
-    data.suma = (data.obruč || 0) + (data.myach || 0) + (data.bułavy || 0) + (data.strichka || 0);
+    data.suma = (data.Обруч || 0) + (data.Мʼяч || 0) + (data.Булави || 0) + (data.Стрічка || 0);
     await set(gymnastRef, data);
 
     // Зберігаємо останню додану
@@ -376,10 +376,10 @@ button:hover {
     <input type="text" id="name" placeholder="Ім’я">
     <input type="text" id="club" placeholder="Клуб">
     <select id="event">
-      <option value="obruč">Обруч</option>
-      <option value="myach">М’яч</option>
-      <option value="bułavy">Булави</option>
-      <option value="strichka">Стрічка</option>
+      <option value="Обруч">Обруч</option>
+      <option value="М’яч">М’яч</option>
+      <option value="Булави">Булави</option>
+      <option value="Стрічка">Стрічка</option>
     </select>
     <input type="text" id="score" placeholder="Оцінка (27.650)">
     <button onclick="addGymnast()">Додати</button>
