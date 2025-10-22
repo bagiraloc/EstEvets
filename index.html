@@ -4,202 +4,172 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Золота Осінь 2025 🍁</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #111;
+      color: #fff;
+      text-align: center;
+      padding: 40px;
+    }
+    h1 {
+      color: gold;
+      font-size: 2.2em;
+    }
+    .hidden { display: none; }
+    input, select, button {
+      margin: 5px;
+      padding: 8px;
+      border-radius: 6px;
+      border: none;
+      font-size: 16px;
+    }
+    button {
+      background: gold;
+      color: #222;
+      cursor: pointer;
+    }
+    table {
+      margin: 20px auto;
+      border-collapse: collapse;
+      width: 90%;
+      max-width: 600px;
+      background: #222;
+    }
+    th, td {
+      border: 1px solid #555;
+      padding: 8px;
+    }
+    th { background: #333; }
+  </style>
+</head>
+<body>
 
-  <!-- Firebase SDK -->
+  <h1>Золота Осінь 2025 🍁</h1>
+
+  <div id="login">
+    <p>🔑 Вхід для судді</p>
+    <input type="password" id="password" placeholder="Введіть пароль">
+    <button onclick="checkPassword()">Увійти</button>
+  </div>
+
+  <div id="panel" class="hidden">
+    <h3>Додати оцінку</h3>
+    <input id="name" placeholder="Прізвище та ім'я">
+    <input id="team" placeholder="Команда">
+    <select id="apparatus">
+      <option value="">Вид</option>
+      <option value="обруч">Обруч</option>
+      <option value="м'яч">М'яч</option>
+      <option value="булави">Булави</option>
+      <option value="стрічка">Стрічка</option>
+    </select>
+    <input id="score" type="number" step="0.001" placeholder="Оцінка">
+    <button onclick="addScore()">Додати</button>
+    <button onclick="clearTable()">Очистити таблицю</button>
+  </div>
+
+  <h2>Результати</h2>
+  <table id="results">
+    <thead>
+      <tr>
+        <th>Місце</th>
+        <th>Ім'я</th>
+        <th>Команда</th>
+        <th>Обруч</th>
+        <th>М'яч</th>
+        <th>Булави</th>
+        <th>Стрічка</th>
+        <th>Сума</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import { getDatabase, ref, set, get, child, update, onValue } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getDatabase, ref, set, get, child, onValue, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-    /* 👇👇 СЮДИ ВСТАВ СВІЙ firebaseConfig 👇👇 */
     const firebaseConfig = {
-      // твій блок firebaseConfig звідси
+      apiKey: "AIzaSyDBXt2gMo92d6MpzxdzEvLI8UMcyHipVTg",
+      authDomain: "estevents.firebaseapp.com",
+      databaseURL: "https://estevents-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "estevents",
+      storageBucket: "estevents.firebasestorage.app",
+      messagingSenderId: "227576344701",
+      appId: "1:227576344701:web:adf679a530b4ce72d5c114",
+      measurementId: "G-3ZDEP57KXF"
     };
-    /* 👆👆 ВСТАВ СЮДИ 👆👆 */
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    /* ---------- ГЛОБАЛЬНІ ЗМІННІ ---------- */
-    let results = {};
-    const events = ["Обруч", "М'яч", "Булави", "Стрічка"];
+    window.checkPassword = function() {
+      const pass = document.getElementById("password").value;
+      if (pass === "123") {
+        document.getElementById("login").classList.add("hidden");
+        document.getElementById("panel").classList.remove("hidden");
+      } else {
+        alert("Неправильний пароль");
+      }
+    };
 
-    function renderTable() {
-      const tbody = document.getElementById("results-body");
-      tbody.innerHTML = "";
+    window.addScore = async function() {
+      const name = document.getElementById("name").value.trim();
+      const team = document.getElementById("team").value.trim();
+      const apparatus = document.getElementById("apparatus").value;
+      const score = parseFloat(document.getElementById("score").value);
 
-      const arr = Object.values(results).map(g => ({
-        ...g,
-        sum: events.reduce((s, e) => s + (parseFloat(g[e]) || 0), 0)
-      })).sort((a,b)=>b.sum - a.sum);
+      if (!name || !team || !apparatus || isNaN(score)) {
+        alert("Заповніть усі поля!");
+        return;
+      }
 
-      arr.forEach((g,i)=>{
-        const tr = document.createElement("tr");
-        const isLeader = i===0;
-        tr.innerHTML = `
-          <td>${i+1}</td>
-          <td>${isLeader ? "👑 " : ""}${g.name}</td>
-          <td>${g.club}</td>
-          ${events.map(e=>`<td>${g[e]||""}</td>`).join("")}
-          <td>${g.sum ? g.sum.toFixed(3):""}</td>
-        `;
-        tbody.appendChild(tr);
+      const dbRef = ref(db, "scores/" + name);
+      const snapshot = await get(dbRef);
+      let data = snapshot.exists() ? snapshot.val() : { team };
+
+      data[apparatus] = score;
+      data.sum = ((data["обруч"] || 0) + (data["м'яч"] || 0) + (data["булави"] || 0) + (data["стрічка"] || 0)).toFixed(3);
+
+      await set(dbRef, data);
+      document.getElementById("score").value = "";
+    };
+
+    onValue(ref(db, "scores"), (snapshot) => {
+      const table = document.querySelector("#results tbody");
+      table.innerHTML = "";
+
+      const results = [];
+      snapshot.forEach(child => {
+        const val = child.val();
+        results.push({ name: child.key, ...val });
       });
-    }
 
-    function saveGymnast(name, club, event, score) {
-      if(!name || !event || !score) return;
-      const key = name.trim().toLowerCase().replace(/\s+/g,"_");
-      const dataRef = ref(db, "gymnasts/" + key);
+      results.sort((a, b) => b.sum - a.sum);
 
-      get(dataRef).then(snap=>{
-        const old = snap.exists()? snap.val() : {};
-        old.name = name;
-        old.club = club || old.club || "";
-        old[event] = parseFloat(score);
-        update(dataRef, old);
+      results.forEach((r, i) => {
+        const row = `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${r.name}</td>
+            <td>${r.team}</td>
+            <td>${r["обруч"] || ""}</td>
+            <td>${r["м'яч"] || ""}</td>
+            <td>${r["булави"] || ""}</td>
+            <td>${r["стрічка"] || ""}</td>
+            <td>${r.sum || ""}</td>
+          </tr>`;
+        table.innerHTML += row;
       });
-    }
-
-    /* ---------- РЕАЛЬНЕ ОНОВЛЕННЯ ---------- */
-    onValue(ref(db,"gymnasts"), snap=>{
-      results = snap.val() || {};
-      renderTable();
     });
 
-    /* ---------- ДОДАВАННЯ УЧАСНИЦІ ---------- */
-    window.addGymnast = function() {
-      const n=document.getElementById("name").value.trim();
-      const c=document.getElementById("club").value.trim();
-      const e=document.getElementById("event").value;
-      const s=document.getElementById("score").value.trim();
-      saveGymnast(n,c,e,s);
-      document.getElementById("score").value="";
-    };
-
-    window.clearTable = function(){
-      document.getElementById("results-body").innerHTML="";
-    };
-
-    /* ---------- ВХІД СУДДІ ---------- */
-    window.checkPassword = function(){
-      const p = prompt("Введіть пароль судді:");
-      if(p==="123"){
-        document.getElementById("judge-panel").style.display="block";
-      } else {
-        alert("❌ Невірний пароль");
+    window.clearTable = async function() {
+      if (confirm("Очистити таблицю?")) {
+        await remove(ref(db, "scores"));
       }
     };
   </script>
 
-  <style>
-    body{
-      margin:0;
-      font-family:Arial, sans-serif;
-      background:#0d0d0d;
-      color:#f6c453;
-      overflow-x:hidden;
-    }
-    h1{
-      text-align:center;
-      color:#f6c453;
-      text-shadow:0 0 20px #f6c453;
-    }
-    table{
-      width:100%;
-      border-collapse:collapse;
-      background:rgba(30,30,30,.9);
-      border-radius:14px;
-      box-shadow:0 0 20px rgba(246,196,83,.3);
-    }
-    th,td{
-      padding:6px;
-      text-align:center;
-      color:#f6c453;
-    }
-    th{
-      border-bottom:2px solid #f6c453;
-    }
-    #judge-panel{
-      display:none;
-      padding:1rem;
-      background:#1e1e1e;
-      position:fixed;
-      bottom:0;
-      width:100%;
-      box-shadow:0 -2px 10px rgba(246,196,83,.3);
-    }
-    input,select{
-      background:#000;
-      color:#f6c453;
-      border:1px solid #f6c453;
-      border-radius:5px;
-      padding:4px 6px;
-      margin:3px;
-    }
-    button{
-      background:linear-gradient(90deg,#f6c453,#b8860b);
-      border:none;
-      border-radius:8px;
-      color:#000;
-      font-weight:bold;
-      padding:5px 10px;
-      cursor:pointer;
-    }
-    .leaf{
-      position:fixed;
-      top:-10vh;
-      color:#ffd700;
-      font-size:24px;
-      opacity:.8;
-      animation:fall linear infinite;
-      z-index:-1;
-    }
-    @keyframes fall{
-      0%{transform:translateY(0) rotate(0);}
-      100%{transform:translateY(110vh) rotate(360deg);}
-    }
-  </style>
-</head>
-
-<body>
-  <h1>Золота Осінь 2025 🍁</h1>
-  <table>
-    <thead>
-      <tr>
-        <th>Місце</th><th>Ім’я</th><th>Клуб</th>
-        <th>Обруч</th><th>М'яч</th><th>Булави</th><th>Стрічка</th><th>Сума</th>
-      </tr>
-    </thead>
-    <tbody id="results-body"></tbody>
-  </table>
-
-  <div id="judge-panel">
-    <input id="name" placeholder="Прізвище та ім’я" />
-    <input id="club" placeholder="Команда" />
-    <select id="event">
-      <option>Обруч</option>
-      <option>М'яч</option>
-      <option>Булави</option>
-      <option>Стрічка</option>
-    </select>
-    <input id="score" placeholder="Оцінка" />
-    <button onclick="addGymnast()">➕ Додати</button>
-    <button onclick="clearTable()">🧹 Очистити таблицю</button>
-  </div>
-
-  <button style="position:fixed;bottom:10px;right:10px;" onclick="checkPassword()">🔐 Увійти як суддя</button>
-
-  <script>
-    /* Додаємо листочки 🍁 */
-    for(let i=0;i<25;i++){
-      const l=document.createElement("div");
-      l.className="leaf";
-      l.textContent=Math.random()>0.5?"🍁":"🍂";
-      l.style.left=Math.random()*100+"vw";
-      l.style.animationDuration=15+Math.random()*15+"s";
-      l.style.animationDelay=Math.random()*20+"s";
-      document.body.appendChild(l);
-    }
-  </script>
 </body>
 </html>
