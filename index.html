@@ -26,7 +26,7 @@
     let lastAdded = null;
     let lastAddedData = null;
 
-    // ✅ Додавання гімнастки (тепер з синхронним оверлеєм)
+    // ✅ Додавання гімнастки (з синхронним оверлеєм)
     window.addGymnast = async function() {
       const name = document.getElementById("name").value.trim();
       const club = document.getElementById("club").value.trim();
@@ -41,7 +41,6 @@
       const gymnastKey = name.replace(/\s+/g, "_");
       const gymnastRef = ref(db, "gymnasts/" + gymnastKey);
 
-      // Читаємо старі дані
       const snapshot = await new Promise(resolve => {
         onValue(gymnastRef, resolve, { onlyOnce: true });
       });
@@ -65,12 +64,13 @@
 
       await set(gymnastRef, updatedData);
 
-      // 🟡 Записуємо сигнал для всіх пристроїв — показати оверлей
+      // 🟡 Сигнал для всіх — показати оверлей
       await set(ref(db, "displayOverlay"), {
         name,
         club,
         event,
         score,
+        gymnastKey,
         time: Date.now()
       });
 
@@ -83,7 +83,7 @@
     };
 
     // ✅ Показ оверлею
-    function showNewGymnastOverlay(name, club, event, score) {
+    function showNewGymnastOverlay(name, club, event, score, gymnastKey) {
       const overlay = document.getElementById("newGymnastOverlay");
       const content = document.getElementById("overlayContent");
       content.innerHTML = `
@@ -93,21 +93,31 @@
         <div class="score">${score.toFixed(3)}</div>
       `;
       overlay.classList.add("visible");
+
+      // 🔄 Через 15 сек — анімація зменшення і "вставання" у таблицю
       setTimeout(() => {
-        overlay.classList.remove("visible");
+        overlay.classList.add("shrinking");
+        setTimeout(() => {
+          overlay.classList.remove("visible", "shrinking");
+          // 💫 Підсвічуємо останню спортсменку в таблиці
+          const row = document.querySelector(`tr[data-key="${gymnastKey}"]`);
+          if (row) {
+            row.classList.add("just-added");
+            setTimeout(() => row.classList.remove("just-added"), 6000);
+          }
+        }, 2500);
       }, 15000);
     }
 
-    // ✅ Слухаємо сигнал з бази, щоб усі бачили оверлей одночасно
+    // ✅ Слухаємо сигнал
     onValue(ref(db, "displayOverlay"), snapshot => {
       const data = snapshot.val();
       if (!data) return;
       const lastTime = window._lastOverlayTime || 0;
       if (data.time > lastTime) {
         window._lastOverlayTime = data.time;
-        showNewGymnastOverlay(data.name, data.club, data.event, data.score);
-        // 🧹 Через 16 секунд очищаємо, щоб не дублювалося
-        setTimeout(() => remove(ref(db, "displayOverlay")), 16000);
+        showNewGymnastOverlay(data.name, data.club, data.event, data.score, data.gymnastKey);
+        setTimeout(() => remove(ref(db, "displayOverlay")), 19000);
       }
     });
 
@@ -149,7 +159,6 @@
       chunks.forEach((group, index) => {
         const table = document.createElement("table");
         table.classList.add("subTable");
-        table.style.width = "auto"; // 👈 все таблиці однакові по ширині
         table.innerHTML = `
           <thead>
             <tr>
@@ -170,8 +179,8 @@
 
         group.forEach((g, i) => {
           const row = document.createElement("tr");
+          row.dataset.key = g.key; // 👈 потрібно для підсвічування
           const crown = (i + index * chunkSize) === 0 ? "👑" : "";
-          if (g.key === lastAdded) row.classList.add("highlight-new");
           row.innerHTML = `
             <td>${i + 1 + index * chunkSize}</td>
             <td class="${(i + index * chunkSize) === 0 ? 'shine' : ''}">${crown} ${g.name}</td>
@@ -184,183 +193,54 @@
             <td><button class="delete-btn" onclick="deleteGymnast('${g.key}')">🍁</button></td>
           `;
           tbody.appendChild(row);
-
-          if (g.key === lastAdded) {
-            setTimeout(() => row.classList.remove("highlight-new"), 2000);
-          }
         });
 
         tableContainer.appendChild(table);
       });
-
-      const totalRows = arr.length;
-      const maxRowsVisible = 12;
-      let scale = 1;
-      if (totalRows > maxRowsVisible) {
-        scale = Math.max(0.35, 1 - (totalRows - maxRowsVisible) * 0.01);
-      }
-      tableContainer.style.transform = `scale(${scale})`;
-      tableContainer.style.transformOrigin = "top center";
     });
-
-    // 🍁 Ефект листя
-    function createLeaf() {
-      const leaf = document.createElement("div");
-      leaf.classList.add("leaf");
-      leaf.textContent = "🍁";
-      leaf.style.left = Math.random() * 100 + "vw";
-      leaf.style.animationDuration = 5 + Math.random() * 10 + "s";
-      leaf.style.fontSize = 20 + Math.random() * 20 + "px";
-      document.body.appendChild(leaf);
-      setTimeout(() => leaf.remove(), 15000);
-    }
-    setInterval(createLeaf, 500);
   </script>
 
   <style>
-    body {
-      background-color: #0d0d0d;
-      color: #f6c453;
-      font-family: "Segoe UI", sans-serif;
-      overflow: hidden;
-      margin: 0;
+    body { background-color:#0d0d0d;color:#f6c453;font-family:"Segoe UI",sans-serif;overflow:hidden;margin:0; }
+    h1 { text-align:center;color:#f6c453;text-shadow:0 0 20px #f6c453;margin-top:10px; }
+    #tablesWrapper { width:100%;display:flex;justify-content:center;gap:20px;flex-wrap:nowrap; }
+    .subTable { border-collapse:collapse;background:rgba(30,30,30,0.9);border-radius:14px;box-shadow:0 0 20px rgba(246,196,83,0.3); }
+    th,td { padding:6px 8px;text-align:center;color:#f6c453;white-space:nowrap; }
+    th { background-color:#1e1e1e;border-bottom:2px solid #f6c453; }
+
+    /* ✨ Підсвічення останньої спортсменки */
+    .just-added {
+      background: radial-gradient(circle at center, rgba(255,215,0,0.3), transparent 70%);
+      animation: pulseRow 1.5s ease-in-out infinite alternate;
     }
-    h1 {
-      text-align: center;
-      color: #f6c453;
-      text-shadow: 0 0 20px #f6c453;
-      margin-top: 10px;
+    @keyframes pulseRow {
+      from { background-color: rgba(255,215,0,0.25); }
+      to { background-color: rgba(255,215,0,0.05); }
     }
-    .leaf {
-      position: fixed;
-      top: -10vh;
-      color: #f6c453;
-      opacity: 0.9;
-      animation: fall linear infinite;
-      z-index: 0;
-    }
-    @keyframes fall {
-      0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-      100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
-    }
-    #tablesWrapper {
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      gap: 20px;
-      flex-wrap: nowrap;
-      transform-origin: top center;
-      transition: transform 0.5s ease;
-    }
-    .subTable {
-      border-collapse: collapse;
-      background: rgba(30,30,30,0.9);
-      border-radius: 14px;
-      box-shadow: 0 0 20px rgba(246,196,83,0.3);
-      transition: transform 0.3s ease;
-      min-width: 600px;
-    }
-    th, td {
-      padding: 6px 8px;
-      text-align: center;
-      color: #f6c453;
-      white-space: nowrap;
-    }
-    th {
-      background-color: #1e1e1e;
-      border-bottom: 2px solid #f6c453;
-    }
-    .highlight-new {
-      animation: appearIn 2s ease-out;
-      background-color: rgba(255,215,0,0.3);
-    }
-    @keyframes appearIn {
-      from { transform: translateY(80px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-    #editPanel {
-      position: fixed;
-      bottom: -200px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(13,13,13,0.95);
-      padding: 12px;
-      text-align: center;
-      box-shadow: 0 -2px 10px rgba(246,196,83,0.2);
-      border-radius: 12px;
-      width: 95%;
-      z-index: 20;
-      transition: bottom 0.5s ease;
-    }
-    #editPanel.visible { bottom: 10px; }
-    input, select {
-      background: #1e1e1e;
-      color: #f6c453;
-      border: 1px solid #f6c453;
-      border-radius: 6px;
-      padding: 4px 8px;
-      margin: 3px;
-    }
-    button {
-      background: linear-gradient(90deg, #f6c453, #b8860b);
-      color: #0d0d0d;
-      border: none;
-      border-radius: 6px;
-      padding: 6px 12px;
-      font-weight: bold;
-      margin: 3px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: linear-gradient(90deg, #ffd700, #f6c453);
-    }
-    .delete-btn {
-      background: none;
-      font-size: 20px;
-      padding: 0;
-      border: none;
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
-    .delete-btn:hover {
-      transform: scale(1.3) rotate(20deg);
-    }
-    .shine {
-      color: #fff799;
-      text-shadow: 0 0 10px #fff799, 0 0 20px #ffcc33;
-      animation: glow 1.5s infinite alternate;
-    }
-    @keyframes glow {
-      from { text-shadow: 0 0 10px #f6c453, 0 0 20px #b8860b; }
-      to { text-shadow: 0 0 20px #ffd700, 0 0 40px #f6c453; }
-    }
+
+    /* 🟡 Оверлей */
     #newGymnastOverlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.95);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      color: #f6c453;
-      flex-direction: column;
-      text-align: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 1s ease;
-      z-index: 100;
+      position:fixed;inset:0;background:rgba(0,0,0,0.95);
+      display:flex;justify-content:center;align-items:center;
+      color:#f6c453;flex-direction:column;text-align:center;
+      opacity:0;pointer-events:none;transition:opacity 1s ease;
+      z-index:100;
     }
-    #newGymnastOverlay.visible {
-      opacity: 1;
-      pointer-events: all;
+    #newGymnastOverlay.visible { opacity:1;pointer-events:all; }
+    #newGymnastOverlay.shrinking {
+      animation: shrinkToTable 2.5s ease-in forwards;
     }
-    #newGymnastOverlay h1 { font-size: 5vw; margin: 10px 0; }
-    #newGymnastOverlay h2 { font-size: 3vw; margin: 5px 0; color: #ffd700; }
-    #newGymnastOverlay h3 { font-size: 2.5vw; margin: 5px 0; color: #fff; }
+    @keyframes shrinkToTable {
+      0% { transform: scale(1); opacity: 1; }
+      80% { transform: scale(0.3); opacity: 0.6; }
+      100% { transform: scale(0); opacity: 0; }
+    }
+
+    #newGymnastOverlay h1 { font-size:5vw;margin:10px 0; }
+    #newGymnastOverlay h2 { font-size:3vw;margin:5px 0;color:#ffd700; }
+    #newGymnastOverlay h3 { font-size:2.5vw;margin:5px 0;color:#fff; }
     #newGymnastOverlay .score {
-      font-size: 6vw;
-      color: #fff799;
-      text-shadow: 0 0 20px #ffd700;
+      font-size:6vw;color:#fff799;text-shadow:0 0 20px #ffd700;
     }
   </style>
 </head>
