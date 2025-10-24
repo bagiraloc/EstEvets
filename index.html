@@ -26,7 +26,6 @@ const db = getDatabase(app);
 let lastAdded = null;
 let lastAddedData = null;
 
-// ✅ Додавання гімнастки (тепер з синхронним оверлеєм)
 window.addGymnast = async function() {
   const name = document.getElementById("name").value.trim();
   const club = document.getElementById("club").value.trim();
@@ -40,7 +39,6 @@ window.addGymnast = async function() {
   const gymnastKey = name.replace(/\s+/g, "_");
   const gymnastRef = ref(db, "gymnasts/" + gymnastKey);
 
-  // Читаємо старі дані
   const snapshot = await new Promise(resolve => {
     onValue(gymnastRef, resolve, { onlyOnce: true });
   });
@@ -63,7 +61,6 @@ window.addGymnast = async function() {
 
   await set(gymnastRef, updatedData);
 
-  // 🟡 Записуємо сигнал для всіх пристроїв — показати оверлей
   await set(ref(db, "displayOverlay"), {
     name,
     club,
@@ -80,7 +77,6 @@ window.addGymnast = async function() {
   document.getElementById("score").value = "";
 };
 
-// ✅ Показ оверлею
 function showNewGymnastOverlay(name, club, event, score) {
   const overlay = document.getElementById("newGymnastOverlay");
   const content = document.getElementById("overlayContent");
@@ -96,7 +92,6 @@ function showNewGymnastOverlay(name, club, event, score) {
   }, 15000);
 }
 
-// ✅ Слухаємо сигнал з бази, щоб усі бачили оверлей одночасно
 onValue(ref(db, "displayOverlay"), snapshot => {
   const data = snapshot.val();
   if (!data) return;
@@ -104,7 +99,6 @@ onValue(ref(db, "displayOverlay"), snapshot => {
   if (data.time > lastTime) {
     window._lastOverlayTime = data.time;
     showNewGymnastOverlay(data.name, data.club, data.event, data.score);
-    // 🧹 Через 16 секунд очищаємо, щоб не дублювалося
     setTimeout(() => remove(ref(db, "displayOverlay")), 16000);
   }
 });
@@ -129,7 +123,6 @@ window.togglePanel = function() {
   panel.classList.toggle("visible");
 };
 
-// ✅ Таблиця
 const tableContainer = document.getElementById("tablesWrapper");
 onValue(ref(db, "gymnasts"), snapshot => {
   const data = snapshot.val() || {};
@@ -139,59 +132,47 @@ onValue(ref(db, "gymnasts"), snapshot => {
 
   tableContainer.innerHTML = "";
 
-  const chunkSize = 30;
-  const chunks = [];
-  for (let i = 0; i < arr.length; i += chunkSize) {
-    chunks.push(arr.slice(i, i + chunkSize));
-  }
-
-  chunks.forEach((group, index) => {
-    const table = document.createElement("table");
-    table.classList.add("subTable");
-    table.style.width = "auto";
-    table.innerHTML = `
-      <thead>
-        <tr>
-          <th>Місце</th>
-          <th>Ім’я</th>
-          <th>Клуб</th>
-          <th>Обруч</th>
-          <th>М’яч</th>
-          <th>Булави</th>
-          <th>Стрічка</th>
-          <th>Сума</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody></tbody>
+  const table = document.createElement("table");
+  table.classList.add("subTable");
+  table.style.width = "100%";
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Місце</th>
+        <th>Ім’я</th>
+        <th>Клуб</th>
+        <th>Обруч</th>
+        <th>М’яч</th>
+        <th>Булави</th>
+        <th>Стрічка</th>
+        <th>Сума</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+  const tbody = table.querySelector("tbody");
+  arr.forEach((g, i) => {
+    const row = document.createElement("tr");
+    const crown = i === 0 ? "👑" : "";
+    if (g.key === lastAdded) row.classList.add("highlight-new");
+    row.innerHTML = `
+      <td>${i + 1}</td>
+      <td class="${i === 0 ? 'shine' : ''}">${crown} ${g.name}</td>
+      <td>${g.club}</td>
+      <td>${g.Обруч || "-"}</td>
+      <td>${g["М’яч"] || "-"}</td>
+      <td>${g.Булави || "-"}</td>
+      <td>${g.Стрічка || "-"}</td>
+      <td><b>${(g.suma || 0).toFixed(3)}</b></td>
+      <td><button class="delete-btn" onclick="deleteGymnast('${g.key}')">🍁</button></td>
     `;
-    const tbody = table.querySelector("tbody");
-    group.forEach((g, i) => {
-      const row = document.createElement("tr");
-      const crown = (i + index * chunkSize) === 0 ? "👑" : "";
-      if (g.key === lastAdded) row.classList.add("highlight-new");
-      row.innerHTML = `
-        <td>${i + 1 + index * chunkSize}</td>
-        <td class="${(i + index * chunkSize) === 0 ? 'shine' : ''}">${crown} ${g.name}</td>
-        <td>${g.club}</td>
-        <td>${g.Обруч || "-"}</td>
-        <td>${g["М’яч"] || "-"}</td>
-        <td>${g.Булави || "-"}</td>
-        <td>${g.Стрічка || "-"}</td>
-        <td><b>${(g.suma || 0).toFixed(3)}</b></td>
-        <td><button class="delete-btn" onclick="deleteGymnast('${g.key}')">🍁</button></td>
-      `;
-      tbody.appendChild(row);
-      if (g.key === lastAdded) {
-        setTimeout(() => row.classList.remove("highlight-new"), 2000);
-      }
-    });
-    tableContainer.appendChild(table);
+    tbody.appendChild(row);
+    if (g.key === lastAdded) {
+      setTimeout(() => row.classList.remove("highlight-new"), 2000);
+    }
   });
-
-  // ✅ Больше нет автомасштаба — только прокрутка
-  tableContainer.style.transform = "none";
-  tableContainer.style.transformOrigin = "top center";
+  tableContainer.appendChild(table);
 });
 
 // 🍁 Ефект листя
@@ -237,25 +218,21 @@ h1 {
 
 #tablesWrapper {
   width: 100%;
-  height: 100vh;               /* 👈 вся высота экрана */
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 20px;
-  flex-wrap: nowrap;
-  overflow-x: auto;            /* 👈 горизонтальный скролл */
-  overflow-y: auto;            /* 👈 вертикальный скролл */
-  transform-origin: top center;
-  transition: transform 0.5s ease;
+  height: calc(100vh - 60px);
+  overflow-x: auto;
+  overflow-y: auto;
+  display: block;
+  padding: 10px;
+  box-sizing: border-box;
 }
 
 .subTable {
   border-collapse: collapse;
+  width: 100%;
   background: rgba(30,30,30,0.9);
   border-radius: 14px;
   box-shadow: 0 0 20px rgba(246,196,83,0.3);
-  transition: transform 0.3s ease;
-  min-width: 600px;
+  min-width: 800px;
 }
 
 th, td {
