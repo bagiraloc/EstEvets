@@ -159,4 +159,46 @@ h1.main-title { text-align: center; font-size: 50px; margin: 10px 0; text-shadow
 .subTable { width: 100%; border-collapse: collapse; background: rgba(30,30,30,0.8); border-radius: 15px; overflow: hidden; }
 th, td { padding: 15px; text-align: center; border-bottom: 1px solid #333; font-size: 22px; }
 th { background: #1e1e1e; color: #f6c453; border-bottom: 2px solid #f6c453; }
-.shine { color: #fff799; text-shadow: 0 0 1
+.shine { color: #fff799; text-shadow: 0 0 10px #f6c453; font-weight: bold; }
+
+#editPanel { position: fixed; bottom: -400px; left: 0; right: 0; background: #111; padding: 20px; 
+             border-top: 3px solid #f6c453; transition: 0.5s; z-index: 2000; text-align: center; }
+#editPanel.visible { bottom: 0; }
+input, select { padding: 10px; margin: 5px; font-size: 18px; background: #222; color: #f6c453; border: 1px solid #f6c453; }
+button { padding: 10px 20px; font-size: 18px; cursor: pointer; background: #f6c453; color: #000; font-weight: bold; border: none; }
+
+#newGymnastOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; 
+                     justify-content: center; align-items: center; opacity: 0; pointer-events: none; 
+                     transition: 0.5s; z-index: 5000; flex-direction: column; }
+#newGymnastOverlay.visible { opacity: 1; pointer-events: all; }
+
+.leaf { position: fixed; top: -50px; animation: fall linear forwards; z-index: 10; font-size: 25px; }
+@keyframes fall { to { transform: translateY(110vh) rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<h1 class="main-title">Золота Осінь 2025 🍁</h1>
+
+<div id="tablesWrapper"></div>
+
+<button style="position:fixed; bottom:20px; right:20px; z-index:3000; border-radius: 50px;" onclick="togglePanel()">⚙️ РЕДАГУВАТИ</button>
+
+<div id="editPanel" id="editPanel">
+  <input type="text" id="name" placeholder="Прізвище Ім'я">
+  <input type="text" id="club" placeholder="Місто / Клуб">
+  <select id="event">
+    <option value="Обруч">Обруч</option>
+    <option value="М’яч">М’яч</option>
+    <option value="Булави">Булави</option>
+    <option value="Стрічка">Стрічка</option>
+  </select>
+  <input type="text" id="score" placeholder="Оцінка (напр. 24.550)">
+  <button onclick="addGymnast()">✅ ДОДАТИ ТА ПОКАЗАТИ</button>
+  <button onclick="clearAll()" style="background: #ff4444; color: white; margin-left: 20px;">🗑️ ОЧИСТИТИ ВСЕ</button>
+</div>
+
+<div id="newGymnastOverlay" id="newGymnastOverlay"></div>
+
+</body>
+</html>
