@@ -24,13 +24,21 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 let lastAdded = null;
-let lastAddedData = null;
 
+// Функція відкриття/закриття панелі (теж через window)
+window.togglePanel = function() {
+  const panel = document.getElementById("editPanel");
+  panel.classList.toggle("visible");
+};
+
+// ДОДАВАННЯ ГІМНАСТКИ
 window.addGymnast = async function() {
   const name = document.getElementById("name").value.trim();
   const club = document.getElementById("club").value.trim();
   const event = document.getElementById("event").value;
-  const score = parseFloat(document.getElementById("score").value.replace(",", "."));
+  const scoreRaw = document.getElementById("score").value.replace(",", ".");
+  const score = parseFloat(scoreRaw);
+
   if (!name || !club || !event || isNaN(score)) {
     alert("Будь ласка, заповніть всі поля правильно!");
     return;
@@ -39,90 +47,59 @@ window.addGymnast = async function() {
   const gymnastKey = name.replace(/\s+/g, "_");
   const gymnastRef = ref(db, "gymnasts/" + gymnastKey);
 
-  const snapshot = await new Promise(resolve => {
-    onValue(gymnastRef, resolve, { onlyOnce: true });
-  });
-  const oldData = snapshot.val() || {};
+  // Отримуємо поточні дані один раз, щоб оновити суму
+  onValue(gymnastRef, async (snapshot) => {
+    const oldData = snapshot.val() || {};
+    
+    const updatedData = {
+      name,
+      club,
+      "Обруч": oldData["Обруч"] || 0,
+      "М’яч": oldData["М’яч"] || 0,
+      "Булави": oldData["Булави"] || 0,
+      "Стрічка": oldData["Стрічка"] || 0,
+    };
 
-  const updatedData = {
-    name,
-    club,
-    Обруч: oldData.Обруч || 0,
-    "М’яч": oldData["М’яч"] || 0,
-    Булави: oldData.Булави || 0,
-    Стрічка: oldData.Стрічка || 0,
-  };
-  updatedData[event] = score;
-  updatedData.suma =
-    (updatedData.Обруч || 0) +
-    (updatedData["М’яч"] || 0) +
-    (updatedData.Булави || 0) +
-    (updatedData.Стрічка || 0);
+    updatedData[event] = score;
+    updatedData.suma = 
+      (updatedData["Обруч"] || 0) + 
+      (updatedData["М’яч"] || 0) + 
+      (updatedData["Булави"] || 0) + 
+      (updatedData["Стрічка"] || 0);
 
-  await set(gymnastRef, updatedData);
+    await set(gymnastRef, updatedData);
 
-  await set(ref(db, "displayOverlay"), {
-    name,
-    club,
-    event,
-    score,
-    time: Date.now()
-  });
+    // Оновлюємо оверлей для випливаючого вікна
+    await set(ref(db, "displayOverlay"), {
+      name,
+      club,
+      event,
+      score,
+      time: Date.now()
+    });
 
-  lastAdded = gymnastKey;
-  lastAddedData = { name, club, event, score };
-
-  document.getElementById("name").value = "";
-  document.getElementById("club").value = "";
-  document.getElementById("score").value = "";
+    lastAdded = gymnastKey;
+    document.getElementById("name").value = "";
+    document.getElementById("club").value = "";
+    document.getElementById("score").value = "";
+  }, { onlyOnce: true });
 };
 
-function showNewGymnastOverlay(name, club, event, score) {
-  const overlay = document.getElementById("newGymnastOverlay");
-  const content = document.getElementById("overlayContent");
-  content.innerHTML = `
-    <h1>${name}</h1>
-    <h2>${club}</h2>
-    <h3>${event.toUpperCase()}</h3>
-    <div class="score">${score.toFixed(3)}</div>
-  `;
-  overlay.classList.add("visible");
-  setTimeout(() => {
-    overlay.classList.remove("visible");
-  }, 15000);
-}
-
-onValue(ref(db, "displayOverlay"), snapshot => {
-  const data = snapshot.val();
-  if (!data) return;
-  const lastTime = window._lastOverlayTime || 0;
-  if (data.time > lastTime) {
-    window._lastOverlayTime = data.time;
-    showNewGymnastOverlay(data.name, data.club, data.event, data.score);
-    setTimeout(() => remove(ref(db, "displayOverlay")), 16000);
-  }
-});
-
-window.clearAll = async function() {
-  if (confirm("Ви впевнені, що хочете повністю очистити таблицю?")) {
-    const gymnastsRef = ref(db, "gymnasts");
-    await set(gymnastsRef, {});
-    alert("Таблицю очищено!");
-  }
-};
-
+// ВИДАЛЕННЯ
 window.deleteGymnast = async function(nameKey) {
   if (confirm("Видалити " + nameKey.replace(/_/g, " ") + "?")) {
-    const gymnastRef = ref(db, "gymnasts/" + nameKey);
-    await remove(gymnastRef);
+    await remove(ref(db, "gymnasts/" + nameKey));
   }
 };
 
-window.togglePanel = function() {
-  const panel = document.getElementById("editPanel");
-  panel.classList.toggle("visible");
+// ОЧИСТКА ТАБЛИЦІ
+window.clearAll = async function() {
+  if (confirm("Ви впевнені, що хочете повністю очистити таблицю?")) {
+    await set(ref(db, "gymnasts"), {});
+  }
 };
 
+// СЛУХАЧ ДАНИХ (ВІДОБРАЖЕННЯ)
 const tableContainer = document.getElementById("tablesWrapper");
 onValue(ref(db, "gymnasts"), snapshot => {
   const data = snapshot.val() || {};
@@ -131,10 +108,8 @@ onValue(ref(db, "gymnasts"), snapshot => {
     .sort((a, b) => b.suma - a.suma);
 
   tableContainer.innerHTML = "";
-
   const table = document.createElement("table");
   table.classList.add("subTable");
-  table.style.width = "100%";
   table.innerHTML = `
     <thead>
       <tr>
@@ -151,6 +126,7 @@ onValue(ref(db, "gymnasts"), snapshot => {
     </thead>
     <tbody></tbody>
   `;
+  
   const tbody = table.querySelector("tbody");
   arr.forEach((g, i) => {
     const row = document.createElement("tr");
@@ -160,23 +136,45 @@ onValue(ref(db, "gymnasts"), snapshot => {
       <td>${i + 1}</td>
       <td class="${i === 0 ? 'shine' : ''}">${crown} ${g.name}</td>
       <td>${g.club}</td>
-      <td>${g.Обруч || "-"}</td>
+      <td>${g["Обруч"] || "-"}</td>
       <td>${g["М’яч"] || "-"}</td>
-      <td>${g.Булави || "-"}</td>
-      <td>${g.Стрічка || "-"}</td>
+      <td>${g["Булави"] || "-"}</td>
+      <td>${g["Стрічка"] || "-"}</td>
       <td><b>${(g.suma || 0).toFixed(3)}</b></td>
       <td><button class="delete-btn" onclick="deleteGymnast('${g.key}')">🍁</button></td>
     `;
     tbody.appendChild(row);
-    if (g.key === lastAdded) {
-      setTimeout(() => row.classList.remove("highlight-new"), 2000);
-    }
   });
   tableContainer.appendChild(table);
 });
 
-// 🍁 Ефект листя
-function createLeaf() {
+// ОБРОБКА ОВЕРЛЕЮ
+function showNewGymnastOverlay(name, club, event, score) {
+  const overlay = document.getElementById("newGymnastOverlay");
+  const content = document.getElementById("overlayContent");
+  content.innerHTML = `
+    <h1>${name}</h1>
+    <h2>${club}</h2>
+    <h3>${event.toUpperCase()}</h3>
+    <div class="score">${score.toFixed(3)}</div>
+  `;
+  overlay.classList.add("visible");
+  setTimeout(() => overlay.classList.remove("visible"), 15000);
+}
+
+onValue(ref(db, "displayOverlay"), snapshot => {
+  const data = snapshot.val();
+  if (!data) return;
+  const lastTime = window._lastOverlayTime || 0;
+  if (data.time > lastTime) {
+    window._lastOverlayTime = data.time;
+    showNewGymnastOverlay(data.name, data.club, data.event, data.score);
+    setTimeout(() => remove(ref(db, "displayOverlay")), 16000);
+  }
+});
+
+// ЕФЕКТ ЛИСТЯ
+setInterval(() => {
   const leaf = document.createElement("div");
   leaf.classList.add("leaf");
   leaf.textContent = "🍁";
@@ -185,8 +183,7 @@ function createLeaf() {
   leaf.style.fontSize = 20 + Math.random() * 20 + "px";
   document.body.appendChild(leaf);
   setTimeout(() => leaf.remove(), 15000);
-}
-setInterval(createLeaf, 500);
+}, 500);
 </script>
 
 <style>
@@ -202,7 +199,7 @@ h1 {
   color: #f6c453;
   text-shadow: 0 0 20px #f6c453;
   margin-top: 10px;
-  font-size: 60px; /* Збільшений розмір */
+  font-size: 60px;
 }
 .leaf {
   position: fixed;
@@ -219,10 +216,8 @@ h1 {
 
 #tablesWrapper {
   width: 100%;
-  height: calc(100vh - 60px);
-  overflow-x: auto;
-  overflow-y: auto;
-  display: block;
+  height: calc(100vh - 80px);
+  overflow: auto;
   padding: 10px;
   box-sizing: border-box;
 }
@@ -233,55 +228,57 @@ h1 {
   background: rgba(30,30,30,0.9);
   border-radius: 14px;
   box-shadow: 0 0 20px rgba(246,196,83,0.3);
-  min-width: 800px;
 }
 
 th, td {
-  padding: 12px 16px; /* Збільшено паддінг */
+  padding: 12px 16px;
   text-align: center;
   color: #f6c453;
-  white-space: nowrap;
-  font-size: 28px; /* Максимальний розмір шрифту */
+  font-size: 24px;
+  border-bottom: 1px solid rgba(246,196,83,0.1);
 }
 
 th {
   background-color: #1e1e1e;
   border-bottom: 2px solid #f6c453;
+  position: sticky;
+  top: 0;
 }
 
 .highlight-new {
   animation: appearIn 2s ease-out;
-  background-color: rgba(255,215,0,0.3);
+  background-color: rgba(255,215,0,0.2);
 }
 @keyframes appearIn {
-  from { transform: translateY(80px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 #editPanel {
   position: fixed;
-  bottom: -200px;
+  bottom: -300px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(13,13,13,0.95);
-  padding: 12px;
+  background: rgba(13,13,13,0.98);
+  padding: 20px;
   text-align: center;
-  box-shadow: 0 -2px 10px rgba(246,196,83,0.2);
-  border-radius: 12px;
-  width: 95%;
-  z-index: 20;
-  transition: bottom 0.5s ease;
+  box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
+  border-radius: 15px 15px 0 0;
+  width: 90%;
+  z-index: 200;
+  transition: bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid #f6c453;
 }
-#editPanel.visible { bottom: 10px; }
+#editPanel.visible { bottom: 0; }
 
 input, select {
   background: #1e1e1e;
   color: #f6c453;
   border: 1px solid #f6c453;
   border-radius: 6px;
-  padding: 6px 12px; /* Збільшено */
-  margin: 3px;
-  font-size: 22px; /* Збільшено */
+  padding: 10px;
+  margin: 5px;
+  font-size: 18px;
 }
 
 button {
@@ -289,76 +286,42 @@ button {
   color: #0d0d0d;
   border: none;
   border-radius: 6px;
-  padding: 10px 20px; /* Збільшено */
+  padding: 10px 25px;
   font-weight: bold;
-  margin: 3px;
   cursor: pointer;
-  font-size: 22px; /* Збільшено */
-}
-button:hover {
-  background: linear-gradient(90deg, #ffd700, #f6c453);
+  font-size: 18px;
 }
 
 .delete-btn {
   background: none;
-  font-size: 32px; /* Збільшено */
-  padding: 0;
+  font-size: 28px;
   border: none;
   cursor: pointer;
-  transition: transform 0.2s;
-}
-.delete-btn:hover {
-  transform: scale(1.3) rotate(20deg);
 }
 
 .shine {
   color: #fff799;
-  text-shadow: 0 0 10px #fff799, 0 0 20px #ffcc33;
+  text-shadow: 0 0 10px #f6c453;
   animation: glow 1.5s infinite alternate;
 }
 @keyframes glow {
-  from { text-shadow: 0 0 10px #f6c453, 0 0 20px #b8860b; }
-  to { text-shadow: 0 0 20px #ffd700, 0 0 40px #f6c453; }
+  from { opacity: 0.8; }
+  to { opacity: 1; text-shadow: 0 0 20px #ffd700; }
 }
 
 #newGymnastOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.95);
+  background: rgba(0, 0, 0, 0.96);
   display: flex;
   justify-content: center;
   align-items: center;
-  color: #f6c453;
-  flex-direction: column;
-  text-align: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 1s ease;
-  z-index: 100;
+  transition: opacity 0.8s ease;
+  z-index: 1000;
 }
-#newGymnastOverlay.visible {
-  opacity: 1;
-  pointer-events: all;
-}
-#newGymnastOverlay h1 {
-  font-size: 8vw;
-  margin: 10px 0;
-}
-#newGymnastOverlay h2 {
-  font-size: 5vw;
-  margin: 5px 0;
-  color: #ffd700;
-}
-#newGymnastOverlay h3 {
-  font-size: 4vw;
-  margin: 5px 0;
-  color: #fff;
-}
-#newGymnastOverlay .score {
-  font-size: 10vw;
-  color: #fff799;
-  text-shadow: 0 0 20px #ffd700;
-}
+#newGymnastOverlay.visible { opacity: 1; pointer-events: all; }
 </style>
 </head>
 
@@ -367,7 +330,7 @@ button:hover {
 
 <div id="tablesWrapper"></div>
 
-<button style="position:fixed; bottom:10px; right:10px; z-index:30;" onclick="togglePanel()">Редагувати 🛠️</button>
+<button style="position:fixed; bottom:20px; right:20px; z-index:300;" onclick="togglePanel()">Редагувати 🛠️</button>
 
 <div id="editPanel">
   <input type="text" id="name" placeholder="Ім’я">
@@ -378,13 +341,14 @@ button:hover {
     <option value="Булави">Булави</option>
     <option value="Стрічка">Стрічка</option>
   </select>
-  <input type="text" id="score" placeholder="Оцінка (27.650)">
+  <input type="text" id="score" placeholder="Оцінка (напр. 25.400)">
   <button onclick="addGymnast()">Додати</button>
-  <button onclick="clearAll()">Очистити таблицю</button>
+  <button onclick="clearAll()" style="background: #551111; color: white;">Очистити все</button>
 </div>
 
 <div id="newGymnastOverlay">
-  <div id="overlayContent"></div>
+  <div id="overlayContent" style="text-align: center;"></div>
 </div>
+
 </body>
 </html>
