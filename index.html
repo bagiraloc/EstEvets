@@ -7,7 +7,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, onValue, set, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+import { getDatabase, ref, onValue, set, remove, get } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDBXt2gMo92d6MpzxdzEvLI8UMcyHipVTg",
@@ -23,15 +23,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-let lastAdded = null;
+// Зробимо доступними функції для кнопок HTML
+window.togglePanel = () => document.getElementById("editPanel").classList.toggle("visible");
 
-// Функція відкриття/закриття панелі (теж через window)
-window.togglePanel = function() {
-  const panel = document.getElementById("editPanel");
-  panel.classList.toggle("visible");
-};
-
-// ДОДАВАННЯ ГІМНАСТКИ
 window.addGymnast = async function() {
   const name = document.getElementById("name").value.trim();
   const club = document.getElementById("club").value.trim();
@@ -39,18 +33,20 @@ window.addGymnast = async function() {
   const scoreRaw = document.getElementById("score").value.replace(",", ".");
   const score = parseFloat(scoreRaw);
 
-  if (!name || !club || !event || isNaN(score)) {
-    alert("Будь ласка, заповніть всі поля правильно!");
+  if (!name || !club || isNaN(score)) {
+    alert("Заповніть всі поля!");
     return;
   }
 
   const gymnastKey = name.replace(/\s+/g, "_");
   const gymnastRef = ref(db, "gymnasts/" + gymnastKey);
 
-  // Отримуємо поточні дані один раз, щоб оновити суму
-  onValue(gymnastRef, async (snapshot) => {
+  try {
+    // 1. Отримуємо існуючі дані
+    const snapshot = await get(gymnastRef);
     const oldData = snapshot.val() || {};
-    
+
+    // 2. Формуємо оновлений об'єкт
     const updatedData = {
       name,
       club,
@@ -61,294 +57,106 @@ window.addGymnast = async function() {
     };
 
     updatedData[event] = score;
-    updatedData.suma = 
-      (updatedData["Обруч"] || 0) + 
-      (updatedData["М’яч"] || 0) + 
-      (updatedData["Булави"] || 0) + 
-      (updatedData["Стрічка"] || 0);
+    updatedData.suma = (updatedData["Обруч"] || 0) + (updatedData["М’яч"] || 0) + 
+                       (updatedData["Булави"] || 0) + (updatedData["Стрічка"] || 0);
 
+    // 3. Відправляємо в базу
     await set(gymnastRef, updatedData);
+    
+    // 4. Окремо відправляємо сигнал на оверлей
+    await set(ref(db, "displayOverlay"), { name, club, event, score, time: Date.now() });
 
-    // Оновлюємо оверлей для випливаючого вікна
-    await set(ref(db, "displayOverlay"), {
-      name,
-      club,
-      event,
-      score,
-      time: Date.now()
-    });
-
-    lastAdded = gymnastKey;
+    // Очистка форми
     document.getElementById("name").value = "";
     document.getElementById("club").value = "";
     document.getElementById("score").value = "";
-  }, { onlyOnce: true });
-};
-
-// ВИДАЛЕННЯ
-window.deleteGymnast = async function(nameKey) {
-  if (confirm("Видалити " + nameKey.replace(/_/g, " ") + "?")) {
-    await remove(ref(db, "gymnasts/" + nameKey));
+    
+    console.log("Дані успішно додано!");
+  } catch (e) {
+    console.error("Помилка:", e);
+    alert("Помилка бази даних!");
   }
 };
 
-// ОЧИСТКА ТАБЛИЦІ
-window.clearAll = async function() {
-  if (confirm("Ви впевнені, що хочете повністю очистити таблицю?")) {
-    await set(ref(db, "gymnasts"), {});
-  }
+window.deleteGymnast = async (key) => {
+  if(confirm("Видалити цю гімнастку?")) await remove(ref(db, "gymnasts/" + key));
 };
 
-// СЛУХАЧ ДАНИХ (ВІДОБРАЖЕННЯ)
-const tableContainer = document.getElementById("tablesWrapper");
-onValue(ref(db, "gymnasts"), snapshot => {
+window.clearAll = async () => {
+  if(confirm("ОЧИСТИТИ ВСЮ ТАБЛИЦЮ?")) await set(ref(db, "gymnasts"), {});
+};
+
+// СЛУХАЧ ТАБЛИЦІ (працює в реальному часі)
+onValue(ref(db, "gymnasts"), (snapshot) => {
   const data = snapshot.val() || {};
-  const arr = Object.entries(data)
+  const wrapper = document.getElementById("tablesWrapper");
+  
+  const sorted = Object.entries(data)
     .map(([key, val]) => ({ key, ...val }))
     .sort((a, b) => b.suma - a.suma);
 
-  tableContainer.innerHTML = "";
-  const table = document.createElement("table");
-  table.classList.add("subTable");
-  table.innerHTML = `
+  let html = `<table class="subTable">
     <thead>
       <tr>
-        <th>Місце</th>
-        <th>Ім’я</th>
-        <th>Клуб</th>
-        <th>Обруч</th>
-        <th>М’яч</th>
-        <th>Булави</th>
-        <th>Стрічка</th>
-        <th>Сума</th>
-        <th></th>
+        <th>Місце</th><th>Ім’я</th><th>Клуб</th>
+        <th>Обруч</th><th>М’яч</th><th>Булави</th><th>Стрічка</th>
+        <th>Сума</th><th></th>
       </tr>
     </thead>
-    <tbody></tbody>
-  `;
-  
-  const tbody = table.querySelector("tbody");
-  arr.forEach((g, i) => {
-    const row = document.createElement("tr");
-    const crown = i === 0 ? "👑" : "";
-    if (g.key === lastAdded) row.classList.add("highlight-new");
-    row.innerHTML = `
+    <tbody>`;
+
+  sorted.forEach((g, i) => {
+    html += `<tr>
       <td>${i + 1}</td>
-      <td class="${i === 0 ? 'shine' : ''}">${crown} ${g.name}</td>
+      <td class="${i === 0 ? 'shine' : ''}">${i === 0 ? '👑 ' : ''}${g.name}</td>
       <td>${g.club}</td>
       <td>${g["Обруч"] || "-"}</td>
       <td>${g["М’яч"] || "-"}</td>
       <td>${g["Булави"] || "-"}</td>
       <td>${g["Стрічка"] || "-"}</td>
-      <td><b>${(g.suma || 0).toFixed(3)}</b></td>
-      <td><button class="delete-btn" onclick="deleteGymnast('${g.key}')">🍁</button></td>
-    `;
-    tbody.appendChild(row);
+      <td><b style="font-size: 1.2em;">${g.suma.toFixed(3)}</b></td>
+      <td><button class="delete-btn" onclick="deleteGymnast('${g.key}')">❌</button></td>
+    </tr>`;
   });
-  tableContainer.appendChild(table);
+
+  html += `</tbody></table>`;
+  wrapper.innerHTML = html;
 });
 
-// ОБРОБКА ОВЕРЛЕЮ
-function showNewGymnastOverlay(name, club, event, score) {
-  const overlay = document.getElementById("newGymnastOverlay");
-  const content = document.getElementById("overlayContent");
-  content.innerHTML = `
-    <h1>${name}</h1>
-    <h2>${club}</h2>
-    <h3>${event.toUpperCase()}</h3>
-    <div class="score">${score.toFixed(3)}</div>
-  `;
-  overlay.classList.add("visible");
-  setTimeout(() => overlay.classList.remove("visible"), 15000);
-}
-
-onValue(ref(db, "displayOverlay"), snapshot => {
+// СЛУХАЧ ОВЕРЛЕЮ
+onValue(ref(db, "displayOverlay"), (snapshot) => {
   const data = snapshot.val();
   if (!data) return;
-  const lastTime = window._lastOverlayTime || 0;
-  if (data.time > lastTime) {
-    window._lastOverlayTime = data.time;
-    showNewGymnastOverlay(data.name, data.club, data.event, data.score);
-    setTimeout(() => remove(ref(db, "displayOverlay")), 16000);
-  }
+  
+  const overlay = document.getElementById("newGymnastOverlay");
+  overlay.innerHTML = `
+    <div style="background: rgba(0,0,0,0.9); padding: 50px; border: 5px solid #f6c453; border-radius: 40px;">
+      <h1 style="font-size: 80px; margin: 0;">${data.name}</h1>
+      <h2 style="font-size: 50px; color: #fff;">${data.club}</h2>
+      <h3 style="font-size: 40px; color: #ffd700;">${data.event.toUpperCase()}</h3>
+      <div style="font-size: 120px; color: #fff799; text-shadow: 0 0 30px #f6c453;">${data.score.toFixed(3)}</div>
+    </div>
+  `;
+  overlay.classList.add("visible");
+  setTimeout(() => overlay.classList.remove("visible"), 8000);
 });
 
-// ЕФЕКТ ЛИСТЯ
+// Листя
 setInterval(() => {
   const leaf = document.createElement("div");
-  leaf.classList.add("leaf");
-  leaf.textContent = "🍁";
+  leaf.className = "leaf"; leaf.textContent = "🍁";
   leaf.style.left = Math.random() * 100 + "vw";
-  leaf.style.animationDuration = 5 + Math.random() * 10 + "s";
-  leaf.style.fontSize = 20 + Math.random() * 20 + "px";
+  leaf.style.animationDuration = (Math.random() * 5 + 5) + "s";
   document.body.appendChild(leaf);
-  setTimeout(() => leaf.remove(), 15000);
-}, 500);
+  setTimeout(() => leaf.remove(), 10000);
+}, 800);
 </script>
 
 <style>
-body {
-  background-color: #0d0d0d;
-  color: #f6c453;
-  font-family: "Segoe UI", sans-serif;
-  overflow: hidden;
-  margin: 0;
-}
-h1 {
-  text-align: center;
-  color: #f6c453;
-  text-shadow: 0 0 20px #f6c453;
-  margin-top: 10px;
-  font-size: 60px;
-}
-.leaf {
-  position: fixed;
-  top: -10vh;
-  color: #f6c453;
-  opacity: 0.9;
-  animation: fall linear infinite;
-  z-index: 0;
-}
-@keyframes fall {
-  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-  100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
-}
-
-#tablesWrapper {
-  width: 100%;
-  height: calc(100vh - 80px);
-  overflow: auto;
-  padding: 10px;
-  box-sizing: border-box;
-}
-
-.subTable {
-  border-collapse: collapse;
-  width: 100%;
-  background: rgba(30,30,30,0.9);
-  border-radius: 14px;
-  box-shadow: 0 0 20px rgba(246,196,83,0.3);
-}
-
-th, td {
-  padding: 12px 16px;
-  text-align: center;
-  color: #f6c453;
-  font-size: 24px;
-  border-bottom: 1px solid rgba(246,196,83,0.1);
-}
-
-th {
-  background-color: #1e1e1e;
-  border-bottom: 2px solid #f6c453;
-  position: sticky;
-  top: 0;
-}
-
-.highlight-new {
-  animation: appearIn 2s ease-out;
-  background-color: rgba(255,215,0,0.2);
-}
-@keyframes appearIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-#editPanel {
-  position: fixed;
-  bottom: -300px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(13,13,13,0.98);
-  padding: 20px;
-  text-align: center;
-  box-shadow: 0 -5px 20px rgba(0,0,0,0.5);
-  border-radius: 15px 15px 0 0;
-  width: 90%;
-  z-index: 200;
-  transition: bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid #f6c453;
-}
-#editPanel.visible { bottom: 0; }
-
-input, select {
-  background: #1e1e1e;
-  color: #f6c453;
-  border: 1px solid #f6c453;
-  border-radius: 6px;
-  padding: 10px;
-  margin: 5px;
-  font-size: 18px;
-}
-
-button {
-  background: linear-gradient(90deg, #f6c453, #b8860b);
-  color: #0d0d0d;
-  border: none;
-  border-radius: 6px;
-  padding: 10px 25px;
-  font-weight: bold;
-  cursor: pointer;
-  font-size: 18px;
-}
-
-.delete-btn {
-  background: none;
-  font-size: 28px;
-  border: none;
-  cursor: pointer;
-}
-
-.shine {
-  color: #fff799;
-  text-shadow: 0 0 10px #f6c453;
-  animation: glow 1.5s infinite alternate;
-}
-@keyframes glow {
-  from { opacity: 0.8; }
-  to { opacity: 1; text-shadow: 0 0 20px #ffd700; }
-}
-
-#newGymnastOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.96);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.8s ease;
-  z-index: 1000;
-}
-#newGymnastOverlay.visible { opacity: 1; pointer-events: all; }
-</style>
-</head>
-
-<body>
-<h1>Золота Осінь 2025 🍁</h1>
-
-<div id="tablesWrapper"></div>
-
-<button style="position:fixed; bottom:20px; right:20px; z-index:300;" onclick="togglePanel()">Редагувати 🛠️</button>
-
-<div id="editPanel">
-  <input type="text" id="name" placeholder="Ім’я">
-  <input type="text" id="club" placeholder="Клуб">
-  <select id="event">
-    <option value="Обруч">Обруч</option>
-    <option value="М’яч">М’яч</option>
-    <option value="Булави">Булави</option>
-    <option value="Стрічка">Стрічка</option>
-  </select>
-  <input type="text" id="score" placeholder="Оцінка (напр. 25.400)">
-  <button onclick="addGymnast()">Додати</button>
-  <button onclick="clearAll()" style="background: #551111; color: white;">Очистити все</button>
-</div>
-
-<div id="newGymnastOverlay">
-  <div id="overlayContent" style="text-align: center;"></div>
-</div>
-
-</body>
-</html>
+body { background: #0d0d0d; color: #f6c453; font-family: sans-serif; margin: 0; overflow: hidden; }
+h1.main-title { text-align: center; font-size: 50px; margin: 10px 0; text-shadow: 0 0 15px #f6c453; }
+#tablesWrapper { padding: 20px; height: 80vh; overflow-y: auto; }
+.subTable { width: 100%; border-collapse: collapse; background: rgba(30,30,30,0.8); border-radius: 15px; overflow: hidden; }
+th, td { padding: 15px; text-align: center; border-bottom: 1px solid #333; font-size: 22px; }
+th { background: #1e1e1e; color: #f6c453; border-bottom: 2px solid #f6c453; }
+.shine { color: #fff799; text-shadow: 0 0 1
