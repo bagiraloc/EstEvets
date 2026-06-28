@@ -1,204 +1,65 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Золота Осінь 2025 🍁</title>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getDatabase, ref, onValue, set, remove, get } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDBXt2gMo92d6MpzxdzEvLI8UMcyHipVTg",
-  authDomain: "estevents.firebaseapp.com",
-  databaseURL: "https://estevents-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "estevents",
-  storageBucket: "estevents.firebasestorage.app",
-  messagingSenderId: "227576344701",
-  appId: "1:227576344701:web:adf679a530b4ce72d5c114",
-  measurementId: "G-3ZDEP57KXF"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-
-// Зробимо доступними функції для кнопок HTML
-window.togglePanel = () => document.getElementById("editPanel").classList.toggle("visible");
-
-window.addGymnast = async function() {
-  const name = document.getElementById("name").value.trim();
-  const club = document.getElementById("club").value.trim();
-  const event = document.getElementById("event").value;
-  const scoreRaw = document.getElementById("score").value.replace(",", ".");
-  const score = parseFloat(scoreRaw);
-
-  if (!name || !club || isNaN(score)) {
-    alert("Заповніть всі поля!");
-    return;
-  }
-
-  const gymnastKey = name.replace(/\s+/g, "_");
-  const gymnastRef = ref(db, "gymnasts/" + gymnastKey);
-
-  try {
-    // 1. Отримуємо існуючі дані
-    const snapshot = await get(gymnastRef);
-    const oldData = snapshot.val() || {};
-
-    // 2. Формуємо оновлений об'єкт
-    const updatedData = {
-      name,
-      club,
-      "Обруч": oldData["Обруч"] || 0,
-      "М’яч": oldData["М’яч"] || 0,
-      "Булави": oldData["Булави"] || 0,
-      "Стрічка": oldData["Стрічка"] || 0,
-    };
-
-    updatedData[event] = score;
-    updatedData.suma = (updatedData["Обруч"] || 0) + (updatedData["М’яч"] || 0) + 
-                       (updatedData["Булави"] || 0) + (updatedData["Стрічка"] || 0);
-
-    // 3. Відправляємо в базу
-    await set(gymnastRef, updatedData);
-    
-    // 4. Окремо відправляємо сигнал на оверлей
-    await set(ref(db, "displayOverlay"), { name, club, event, score, time: Date.now() });
-
-    // Очистка форми
-    document.getElementById("name").value = "";
-    document.getElementById("club").value = "";
-    document.getElementById("score").value = "";
-    
-    console.log("Дані успішно додано!");
-  } catch (e) {
-    console.error("Помилка:", e);
-    alert("Помилка бази даних!");
-  }
-};
-
-window.deleteGymnast = async (key) => {
-  if(confirm("Видалити цю гімнастку?")) await remove(ref(db, "gymnasts/" + key));
-};
-
-window.clearAll = async () => {
-  if(confirm("ОЧИСТИТИ ВСЮ ТАБЛИЦЮ?")) await set(ref(db, "gymnasts"), {});
-};
-
-// СЛУХАЧ ТАБЛИЦІ (працює в реальному часі)
-onValue(ref(db, "gymnasts"), (snapshot) => {
-  const data = snapshot.val() || {};
-  const wrapper = document.getElementById("tablesWrapper");
-  
-  const sorted = Object.entries(data)
-    .map(([key, val]) => ({ key, ...val }))
-    .sort((a, b) => b.suma - a.suma);
-
-  let html = `<table class="subTable">
-    <thead>
-      <tr>
-        <th>Місце</th><th>Ім’я</th><th>Клуб</th>
-        <th>Обруч</th><th>М’яч</th><th>Булави</th><th>Стрічка</th>
-        <th>Сума</th><th></th>
-      </tr>
-    </thead>
-    <tbody>`;
-
-  sorted.forEach((g, i) => {
-    html += `<tr>
-      <td>${i + 1}</td>
-      <td class="${i === 0 ? 'shine' : ''}">${i === 0 ? '👑 ' : ''}${g.name}</td>
-      <td>${g.club}</td>
-      <td>${g["Обруч"] || "-"}</td>
-      <td>${g["М’яч"] || "-"}</td>
-      <td>${g["Булави"] || "-"}</td>
-      <td>${g["Стрічка"] || "-"}</td>
-      <td><b style="font-size: 1.2em;">${g.suma.toFixed(3)}</b></td>
-      <td><button class="delete-btn" onclick="deleteGymnast('${g.key}')">❌</button></td>
-    </tr>`;
-  });
-
-  html += `</tbody></table>`;
-  wrapper.innerHTML = html;
-});
-
-// СЛУХАЧ ОВЕРЛЕЮ
-onValue(ref(db, "displayOverlay"), (snapshot) => {
-  const data = snapshot.val();
-  if (!data) return;
-  
-  const overlay = document.getElementById("newGymnastOverlay");
-  overlay.innerHTML = `
-    <div style="background: rgba(0,0,0,0.9); padding: 50px; border: 5px solid #f6c453; border-radius: 40px;">
-      <h1 style="font-size: 80px; margin: 0;">${data.name}</h1>
-      <h2 style="font-size: 50px; color: #fff;">${data.club}</h2>
-      <h3 style="font-size: 40px; color: #ffd700;">${data.event.toUpperCase()}</h3>
-      <div style="font-size: 120px; color: #fff799; text-shadow: 0 0 30px #f6c453;">${data.score.toFixed(3)}</div>
-    </div>
-  `;
-  overlay.classList.add("visible");
-  setTimeout(() => overlay.classList.remove("visible"), 8000);
-});
-
-// Листя
-setInterval(() => {
-  const leaf = document.createElement("div");
-  leaf.className = "leaf"; leaf.textContent = "🍁";
-  leaf.style.left = Math.random() * 100 + "vw";
-  leaf.style.animationDuration = (Math.random() * 5 + 5) + "s";
-  document.body.appendChild(leaf);
-  setTimeout(() => leaf.remove(), 10000);
-}, 800);
-</script>
-
-<style>
-body { background: #0d0d0d; color: #f6c453; font-family: sans-serif; margin: 0; overflow: hidden; }
-h1.main-title { text-align: center; font-size: 50px; margin: 10px 0; text-shadow: 0 0 15px #f6c453; }
-#tablesWrapper { padding: 20px; height: 80vh; overflow-y: auto; }
-.subTable { width: 100%; border-collapse: collapse; background: rgba(30,30,30,0.8); border-radius: 15px; overflow: hidden; }
-th, td { padding: 15px; text-align: center; border-bottom: 1px solid #333; font-size: 22px; }
-th { background: #1e1e1e; color: #f6c453; border-bottom: 2px solid #f6c453; }
-.shine { color: #fff799; text-shadow: 0 0 10px #f6c453; font-weight: bold; }
-
-#editPanel { position: fixed; bottom: -400px; left: 0; right: 0; background: #111; padding: 20px; 
-             border-top: 3px solid #f6c453; transition: 0.5s; z-index: 2000; text-align: center; }
-#editPanel.visible { bottom: 0; }
-input, select { padding: 10px; margin: 5px; font-size: 18px; background: #222; color: #f6c453; border: 1px solid #f6c453; }
-button { padding: 10px 20px; font-size: 18px; cursor: pointer; background: #f6c453; color: #000; font-weight: bold; border: none; }
-
-#newGymnastOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; 
-                     justify-content: center; align-items: center; opacity: 0; pointer-events: none; 
-                     transition: 0.5s; z-index: 5000; flex-direction: column; }
-#newGymnastOverlay.visible { opacity: 1; pointer-events: all; }
-
-.leaf { position: fixed; top: -50px; animation: fall linear forwards; z-index: 10; font-size: 25px; }
-@keyframes fall { to { transform: translateY(110vh) rotate(360deg); } }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой PDF Документ</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        .btn {
+            display: inline-block;
+            margin: 20px 0;
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            font-size: 16px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        iframe {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
 
-<h1 class="main-title">Золота Осінь 2025 🍁</h1>
+    <div class="container">
+        <h1>Название вашего документа</h1>
+        <p>Здесь вы можете просмотреть документ или скачать его на свое устройство.</p>
 
-<div id="tablesWrapper"></div>
+        <a href="document.pdf" class="btn" download>Скачать PDF</a>
 
-<button style="position:fixed; bottom:20px; right:20px; z-index:3000; border-radius: 50px;" onclick="togglePanel()">⚙️ РЕДАГУВАТИ</button>
-
-<div id="editPanel" id="editPanel">
-  <input type="text" id="name" placeholder="Прізвище Ім'я">
-  <input type="text" id="club" placeholder="Місто / Клуб">
-  <select id="event">
-    <option value="Обруч">Обруч</option>
-    <option value="М’яч">М’яч</option>
-    <option value="Булави">Булави</option>
-    <option value="Стрічка">Стрічка</option>
-  </select>
-  <input type="text" id="score" placeholder="Оцінка (напр. 24.550)">
-  <button onclick="addGymnast()">✅ ДОДАТИ ТА ПОКАЗАТИ</button>
-  <button onclick="clearAll()" style="background: #ff4444; color: white; margin-left: 20px;">🗑️ ОЧИСТИТИ ВСЕ</button>
-</div>
-
-<div id="newGymnastOverlay" id="newGymnastOverlay"></div>
+        <h2>Просмотр:</h2>
+        <iframe src="document.pdf">
+            Ваш браузер не поддерживает встроенные PDF. Вы можете <a href="document.pdf">скачать его здесь</a>.
+        </iframe>
+    </div>
 
 </body>
 </html>
